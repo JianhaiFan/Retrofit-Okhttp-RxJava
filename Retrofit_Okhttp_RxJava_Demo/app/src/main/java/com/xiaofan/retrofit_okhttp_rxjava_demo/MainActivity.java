@@ -6,8 +6,11 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 
 import com.xiaofan.retrofit_okhttp_rxjava_demo.bean.User;
+import com.xiaofan.retrofit_okhttp_rxjava_demo.constant.Constant;
 import com.xiaofan.retrofit_okhttp_rxjava_demo.util.LogUtil;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
@@ -22,13 +25,11 @@ public class MainActivity extends AppCompatActivity {
     private Retrofit retrofit;
     private OkHttpClient mOkHttpClient;
 
-    public static final String BASE_URL = "http://192.168.1.24:9090/";
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        //http://192.168.1.24:9090/sysCommon/control/restful/ajaxGetVerificationCode?partyClient=appTypeEnum_0&type=5006&userLoginId=83112345678
+        //http://192.168.1.24:9090/sysCommon/control/restful/ajaxGetVerificationCode
 //        0 = {HashMap$HashMapEntry@830049680328} "partyClient" -> "appTypeEnum_0"
 //        1 = {HashMap$HashMapEntry@830049680216} "type" -> "5006"
 //        2 = {HashMap$HashMapEntry@830049680184} "userLoginId" -> "83112345678"
@@ -42,7 +43,7 @@ public class MainActivity extends AppCompatActivity {
         mOkHttpClient = builder.build();
         // 初始化Retrofit
         retrofit = new Retrofit.Builder()
-                .baseUrl(BASE_URL)
+                .baseUrl(Constant.BASE_URL)
                 .addConverterFactory(GsonConverterFactory.create())
                 .client(mOkHttpClient)
                 .build();
@@ -53,7 +54,17 @@ public class MainActivity extends AppCompatActivity {
 
         IApi iApi = retrofit.create(IApi.class);
 
-        Call<User> call = iApi.ajaxGetVerificationCode("appTypeEnum_0","5006","83133333333");
+//        Call<User> call = iApi.ajaxGetVerificationCode("appTypeEnum_0","5006","83133333333");
+
+//        ParamBean paramBean = new ParamBean("appTypeEnum_0","5006","83133333333");
+//        Call<User> call = iApi.ajaxGetVerificationCode(paramBean);
+
+        Map<String,String> params = new HashMap<String,String>();
+        params.put("partyClient","appTypeEnum_0");
+        params.put("type","5006");
+        params.put("userLoginId","83112345678");
+
+        Call<User> call = iApi.ajaxGetVerificationCode(params);
 
         call.enqueue(new Callback<User>() {
             @Override
