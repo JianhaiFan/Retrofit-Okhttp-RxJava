@@ -2,16 +2,20 @@
 package com.xiaofan.retrofit_okhttp_rxjava_demo;
 
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 
 import com.xiaofan.retrofit_okhttp_rxjava_demo.bean.Course;
+import com.xiaofan.retrofit_okhttp_rxjava_demo.bean.ParamBean;
 import com.xiaofan.retrofit_okhttp_rxjava_demo.bean.Student;
+import com.xiaofan.retrofit_okhttp_rxjava_demo.bean.User;
 import com.xiaofan.retrofit_okhttp_rxjava_demo.constant.Constant;
 import com.xiaofan.retrofit_okhttp_rxjava_demo.util.LogUtil;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -24,7 +28,10 @@ import rx.Observable;
 import rx.Subscriber;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action0;
+import rx.functions.Action1;
 import rx.functions.Func1;
+import rx.functions.Func2;
+import rx.observables.GroupedObservable;
 import rx.schedulers.Schedulers;
 /**
  * @author: 范建海
@@ -72,6 +79,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onClick(View view) {
+
+        //        testRetrofit();
+//        testRxJavaFile();
+//        testRxJavaGroupby();
+//        testRxJavaMap();
+//        testRxJavaWindow();
+//        testRxJavaDistinct();
+//        testRxJavaDebounce();
+//        testRxJavaFilter();
+//        testRxJavaOfType();
+//        testRxJavaSingle();
+//        testRxJavaSample();
+//          testRxJavaTake();
+//        testRxJavaCombine();
+//        testRxJavaRetry();
+//        testRxJavaRetryWhen();
+
 
 //        IApi iApi = retrofit.create(IApi.class);
 
@@ -416,33 +440,560 @@ public class MainActivity extends AppCompatActivity {
 
         // 线程控制2
 
-        Observable.just(1,2)
+//        Observable.just(1,2)
+//                .subscribeOn(Schedulers.io())
+//                .doOnSubscribe(new Action0() {
+//                    @Override
+//                    public void call() {
+//                        progressBar.setVisibility(View.VISIBLE); // 需要在主线程执行
+//                    }
+//                })
+//                .subscribeOn(AndroidSchedulers.mainThread()) // 指定主线程
+//                .observeOn(AndroidSchedulers.mainThread())
+//                .subscribe(new Subscriber<Integer>() {
+//                    @Override
+//                    public void onCompleted() {
+//                        LogUtil.e("===============");
+//                    }
+//
+//                    @Override
+//                    public void onError(Throwable e) {
+//
+//                    }
+//
+//                    @Override
+//                    public void onNext(Integer num) {
+//                        LogUtil.e("number: " + num);
+//                    }
+//                });
+
+//=============================================================================================
+//=============================================================================================
+
+        IApi iApi = retrofit.create(IApi.class);
+        iApi.ajaxGetVerificationCode(new ParamBean("appTypeEnum_0","5006","83133333333"))
                 .subscribeOn(Schedulers.io())
                 .doOnSubscribe(new Action0() {
                     @Override
                     public void call() {
-                        progressBar.setVisibility(View.VISIBLE); // 需要在主线程执行
+                        progressBar.setVisibility(View.VISIBLE);
                     }
                 })
-                .subscribeOn(AndroidSchedulers.mainThread()) // 指定主线程
+                .subscribeOn(AndroidSchedulers.mainThread())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(new Subscriber<Integer>() {
+                .doOnNext(new Action1<User>() {
+                    @Override
+                    public void call(User user) {
+
+                        Schedulers.io().createWorker().schedule(new Action0() {
+                            @Override
+                            public void call() {
+                                try {
+                                    LogUtil.e("Thread name: " + Thread.currentThread().getName());
+                                    Thread.sleep(2000);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        });
+                    }
+                })
+                .subscribe(new Subscriber<User>() {
                     @Override
                     public void onCompleted() {
-                        LogUtil.e("===============");
+                        progressBar.setVisibility(View.GONE);
                     }
 
                     @Override
                     public void onError(Throwable e) {
-
+                        LogUtil.e("onError...");
+                        LogUtil.e("error msg: " + e.getMessage());
+                        progressBar.setVisibility(View.GONE);
                     }
 
                     @Override
-                    public void onNext(Integer num) {
-                        LogUtil.e("number: " + num);
+                    public void onNext(User user) {
+                        LogUtil.e("onSuccess..");
+                        LogUtil.e("status: " + user.getStatus() + ",msg: " + user.getMsg());
+                    }
+                });
+
+    }
+
+
+    public void testRxJavaRetryWhen() {
+        Observable<Integer> observable = Observable.create(new Observable.OnSubscribe<Integer>() {
+            @Override
+            public void call(Subscriber<? super Integer> subscriber) {
+                System.out.println("subscribing");
+                subscriber.onError(new RuntimeException("always fails"));
+            }
+        });
+
+        observable.retryWhen(new Func1<Observable<? extends Throwable>, Observable<?>>() {
+
+            @Override
+            public Observable<?> call(Observable<? extends Throwable> observable) {
+
+                return observable.zipWith(Observable.range(1, 3), new Func2<Throwable, Integer, Integer>() {
+                    @Override
+                    public Integer call(Throwable throwable, Integer integer) {
+                        return integer / 0;
+                    }
+                }).flatMap(new Func1<Integer, Observable<?>>() {
+                    @Override
+                    public Observable<?> call(Integer integer) {
+                        System.out.println("delay retry by " + integer + " second(s)");
+                        //每一秒中执行一次
+                        return Observable.timer(integer, TimeUnit.SECONDS);
+                    }
+                });
+            }
+        }).subscribe(new Subscriber<Integer>() {
+            @Override
+            public void onCompleted() {
+                System.out.println("Sequence complete.");
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                System.err.println("Error: " + e.getMessage());
+            }
+
+            @Override
+            public void onNext(Integer value) {
+                System.out.println("Next:" + value);
+            }
+        });
+    }
+
+
+    public void testRxJavaRetry() {
+        Observable<Integer> observable = Observable.create(new Observable.OnSubscribe<Integer>() {
+            @Override
+            public void call(Subscriber<? super Integer> subscriber) {
+                if (subscriber.isUnsubscribed()) return;
+                //循环输出数字
+                try {
+                    for (int i = 0; i < 10; i++) {
+                        if (i == 4) {
+                            throw new Exception("this is number 4 error！");
+                        }
+                        subscriber.onNext(i);
+                    }
+                    subscriber.onCompleted();
+                } catch (Throwable e) {
+                    subscriber.onError(e);
+                }
+            }
+        });
+
+        observable.retry(2).subscribe(new Subscriber<Integer>() {
+            @Override
+            public void onCompleted() {
+                System.out.println("Sequence complete.");
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                System.err.println("Error: " + e.getMessage());
+            }
+
+            @Override
+            public void onNext(Integer value) {
+                System.out.println("Next:" + value);
+            }
+        });
+    }
+
+    public void testRxJavaCombine() {
+        //产生0,5,10,15,20数列
+        Observable<Long> observable1 = Observable.timer(0, 1000, TimeUnit.MILLISECONDS)
+                .map(new Func1<Long, Long>() {
+                    @Override
+                    public Long call(Long aLong) {
+                        return aLong * 5;
+                    }
+                }).take(5);
+
+        //产生0,10,20,30,40数列
+        Observable<Long> observable2 = Observable.timer(500, 1000, TimeUnit.MILLISECONDS)
+                .map(new Func1<Long, Long>() {
+                    @Override
+                    public Long call(Long aLong) {
+                        return aLong * 10;
+                    }
+                }).take(5);
+
+
+        Observable.combineLatest(observable1, observable2, new Func2<Long, Long, Long>() {
+            @Override
+            public Long call(Long aLong, Long aLong2) {
+                return aLong+aLong2;
+            }
+        }).subscribe(new Subscriber<Long>() {
+            @Override
+            public void onCompleted() {
+                System.out.println("Sequence complete.");
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                System.err.println("Error: " + e.getMessage());
+            }
+
+            @Override
+            public void onNext(Long aLong) {
+                System.out.println("Next: " + aLong);
+            }
+        });
+    }
+
+    public void testRxJavaTake() {
+        Observable.just(1, 2, 3, 4, 5, 6, 7, 8)
+                .take(9)
+                .subscribe(new Subscriber<Integer>() {
+                    @Override
+                    public void onNext(Integer item) {
+                        System.out.println("Next: " + item);
+                    }
+
+                    @Override
+                    public void onError(Throwable error) {
+                        System.err.println("Error: " + error.getMessage());
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                        System.out.println("Sequence complete.");
                     }
                 });
     }
+
+    public void testRxJavaSample() {
+        Observable.create(new Observable.OnSubscribe<Integer>() {
+            @Override
+            public void call(Subscriber<? super Integer> subscriber) {
+                if(subscriber.isUnsubscribed()) return;
+                try {
+                    //前8个数字产生的时间间隔为1秒，后一个间隔为3秒
+                    for (int i = 1; i < 9; i++) {
+                        subscriber.onNext(i);
+                        Thread.sleep(1000);
+                    }
+                    Thread.sleep(2000);
+                    subscriber.onNext(9);
+                    subscriber.onCompleted();
+                } catch(Exception e){
+                    subscriber.onError(e);
+                }
+            }
+        }).subscribeOn(Schedulers.newThread())
+                .sample(2200, TimeUnit.MILLISECONDS)  //采样间隔时间为2200毫秒
+                .subscribe(new Subscriber<Integer>() {
+                    @Override
+                    public void onNext(Integer item) {
+                        System.out.println("Next: " + item);
+                    }
+
+                    @Override
+                    public void onError(Throwable error) {
+                        System.err.println("Error: " + error.getMessage());
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                        System.out.println("Sequence complete.");
+                    }
+                });
+    }
+
+    public void testRxJavaSingle() {
+        Observable.just(1,2,3,4,5,6,7,8,9,10)
+                .single(new Func1<Integer, Boolean>() {
+                    @Override
+                    public Boolean call(Integer integer) {
+                        //取大于10的第一个数字
+                        return integer>7;
+                    }
+                })
+                .subscribe(new Subscriber<Integer>() {
+                    @Override
+                    public void onNext(Integer item) {
+                        System.out.println("Next: " + item);
+                    }
+
+                    @Override
+                    public void onError(Throwable error) {
+                        System.err.println("Error: " + error.getMessage());
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                        System.out.println("Sequence complete.");
+                    }
+                });
+    }
+
+    public void testRxJavaOfType() {
+
+        Observable.just(1, "hello world", true, 200L, 0.23f)
+                .ofType(String.class)
+                .subscribe(new Subscriber<Object>() {
+                    @Override
+                    public void onNext(Object item) {
+                        System.out.println("Next: " + item);
+                    }
+
+                    @Override
+                    public void onError(Throwable error) {
+                        System.err.println("Error: " + error.getMessage());
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                        System.out.println("Sequence complete.");
+                    }
+                });
+    }
+
+    public void testRxJavaFilter() {
+        Observable.just(1, 2, 3, 4, 5)
+                .filter(new Func1<Integer, Boolean>() {
+                    @Override
+                    public Boolean call(Integer item) {
+                        return item % 2 == 0;
+                    }
+                })
+                .subscribe(new Subscriber<Integer>() {
+                    @Override
+                    public void onNext(Integer item) {
+                        System.out.println("Next: " + item);
+                    }
+
+                    @Override
+                    public void onError(Throwable error) {
+                        System.err.println("Error: " + error.getMessage());
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                        System.out.println("Sequence complete.");
+                    }
+                });
+    }
+
+    public void testRxJavaDebounce() {
+        Observable.create(new Observable.OnSubscribe<Integer>() {
+            @Override
+            public void call(Subscriber<? super Integer> subscriber) {
+                if(subscriber.isUnsubscribed()) return;
+                try {
+                    //产生结果的间隔时间分别为100、200、300...900毫秒
+                    for (int i = 1; i < 10; i++) {
+                        subscriber.onNext(i);
+                        Thread.sleep(i * 100);
+                    }
+                    subscriber.onCompleted();
+                }catch(Exception e){
+                    subscriber.onError(e);
+                }
+            }
+        }).subscribeOn(Schedulers.newThread())
+                .debounce(400, TimeUnit.MILLISECONDS)  //超时时间为400毫秒
+                .subscribe(
+                        new Action1<Integer>() {
+                            @Override
+                            public void call(Integer integer) {
+                                System.out.println("Next:" + integer);
+                            }
+                        }, new Action1<Throwable>() {
+                            @Override
+                            public void call(Throwable throwable) {
+                                System.out.println("Error:" + throwable.getMessage());
+                            }
+                        }, new Action0() {
+                            @Override
+                            public void call() {
+                                System.out.println("completed!");
+                            }
+                        });
+    }
+
+    public void testRxJavaDistinct() {
+        Observable.just(1, 2, 1, 1, 2, 3)
+                .distinct()
+                .subscribe(new Subscriber<Integer>() {
+                    @Override
+                    public void onNext(Integer item) {
+                        System.out.println("Next: " + item);
+                    }
+
+                    @Override
+                    public void onError(Throwable error) {
+                        System.err.println("Error: " + error.getMessage());
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                        System.out.println("Sequence complete.");
+                    }
+                });
+    }
+
+    public void testRxJavaWindow() {
+        Observable.interval(1, TimeUnit.SECONDS).take(12)
+                .window(3, TimeUnit.SECONDS)
+                .subscribe(new Action1<Observable<Long>>() {
+                    @Override
+                    public void call(Observable<Long> observable) {
+                        System.out.println("subdivide begin......");
+                        observable.subscribe(new Action1<Long>() {
+                            @Override
+                            public void call(Long aLong) {
+                                System.out.println("Next:" + aLong);
+                            }
+                        });
+                    }
+                });
+    }
+
+    public void testRxJavaMap() {
+        Observable.just(1,2,3,4,5,6).map(new Func1<Integer, Integer>() {
+            @Override
+            public Integer call(Integer integer) {
+                //对源Observable产生的结果，都统一乘以3处理
+                return integer*3;
+            }
+        }).subscribe(new Action1<Integer>() {
+            @Override
+            public void call(Integer integer) {
+                System.out.println("next:" + integer);
+            }
+        });
+    }
+
+
+    public void testRxJavaGroupby() {
+        Observable.interval(1, TimeUnit.SECONDS).take(6).groupBy(new Func1<Long, Long>() {
+            @Override
+            public Long call(Long value) {
+                //按照key为0,1,2分为3组
+                return value % 3;
+            }
+        }).subscribe(new Action1<GroupedObservable<Long, Long>>() {
+            @Override
+            public void call(final GroupedObservable<Long, Long> result) {
+                result.subscribe(new Action1<Long>() {
+                    @Override
+                    public void call(Long value) {
+                        System.out.println("key:" + result.getKey() +", value:" + value);
+                    }
+                });
+            }
+        });
+    }
+
+    // 遍历指定目录下的所有文件
+    public void testRxJavaFile() {
+
+        String path = Environment.getExternalStorageDirectory() + "/images/";
+
+        Observable.just(new File(path))
+                .concatMap(new Func1<File, Observable<File>>() {
+                    @Override
+                    public Observable<File> call(File file) {
+                        //参数file是just操作符产生的结果，这里判断file是不是目录文件，如果是目录文件，则递归查找其子文件
+                        // flatMap操作符神奇的地方在于，返回的结果还是一个Observable，而这个Observable其实是包含多个文件的Observable的，输出应该是ExternalCacheDir下的所有文件
+                        return listFiles(file);
+                    }
+                })
+                .subscribe(new Subscriber<File>() {
+                    @Override
+                    public void onCompleted() {
+                        LogUtil.e("onCompleted...");
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        LogUtil.e("onError: " + e.getMessage());
+                    }
+
+                    @Override
+                    public void onNext(File file) {
+                        LogUtil.e("onNext: " + file.getAbsolutePath());
+                    }
+                });
+    }
+
+    private Observable<File> listFiles(final File f){
+        if(f.isDirectory()){
+            return Observable.from(f.listFiles()).concatMap(new Func1<File, Observable<File>>() {
+                @Override
+                public Observable<File> call(File file) {
+                    return listFiles(file);
+                }
+            });
+        } else {
+            return Observable.just(f);
+        }
+    }
+
+
+
+    public void testRetrofit() {
+        IApi iApi = retrofit.create(IApi.class);
+        iApi.ajaxGetVerificationCode(new ParamBean("appTypeEnum_0","5006","83133333333"))
+                .subscribeOn(Schedulers.io())
+                .doOnSubscribe(new Action0() {
+                    @Override
+                    public void call() {
+                        progressBar.setVisibility(View.VISIBLE);
+                        LogUtil.e("doOnSubscribe...");
+                    }
+                })
+                .subscribeOn(AndroidSchedulers.mainThread())
+                .unsubscribeOn(AndroidSchedulers.mainThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .retry(2)
+                .doOnNext(new Action1<User>() {
+                    @Override
+                    public void call(User user) {
+
+                        Schedulers.io().createWorker().schedule(new Action0() {
+                            @Override
+                            public void call() {
+                                try {
+                                    LogUtil.e("Thread name: " + Thread.currentThread().getName());
+                                    Thread.sleep(2000);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        });
+                    }
+                })
+                .subscribe(new Subscriber<User>() {
+                    @Override
+                    public void onCompleted() {
+                        progressBar.setVisibility(View.GONE);
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        LogUtil.e("onError...");
+                        LogUtil.e("error msg: " + e.getMessage());
+                        progressBar.setVisibility(View.GONE);
+                    }
+
+                    @Override
+                    public void onNext(User user) {
+                        LogUtil.e("onSuccess..");
+                        LogUtil.e("status: " + user.getStatus() + ",msg: " + user.getMsg());
+                    }
+                });
+    }
+
 
 
 }
